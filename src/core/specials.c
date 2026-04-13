@@ -772,33 +772,56 @@ static int32_t janetc_addfuncdef(JanetCompiler *c, JanetFuncDef *def) {
 static JanetSlot janetc_break(JanetFopts opts, int32_t argn, const Janet *argv) {
     JanetCompiler *c = opts.compiler;
     JanetScope *scope = c->scope;
-    if (argn > 1) {
-        janetc_cerror(c, "expected at most 1 argument");
+    int32_t levels = 1;
+    if (argn > 2) {
+        janetc_cerror(c, "expected at most 2 arguments");
         return janetc_cslot(janet_wrap_nil());
     }
 
+    if (argn == 2) {
+        JanetSlot level_slot = janetc_value(janetc_fopts_default(c), argv[1]);
+        if (!(level_slot.flags & JANET_SLOT_CONSTANT) || !janet_checkint(level_slot.constant)) {
+            janetc_cerror(c, "expected constant integer for break level");
+            return janetc_cslot(janet_wrap_nil());
+        }
+        levels = janet_unwrap_integer(level_slot.constant);
+    }
+
     /* Find scope to break from */
+    int32_t skips_remaining = levels > 0 ? levels - 1 : -1;
+    int32_t while_skips = 0;
     while (scope) {
-        if (scope->flags & (JANET_SCOPE_FUNCTION | JANET_SCOPE_WHILE))
-            break;
+        if (scope->flags & JANET_SCOPE_FUNCTION) {
+            break; /* Can't jump out of functions */
+        }
+        if (scope->flags & JANET_SCOPE_WHILE) {
+            if (skips_remaining == 0) break;
+            if (skips_remaining > 0) skips_remaining--;
+            while_skips++;
+        }
         scope = scope->parent;
     }
+
     if (NULL == scope) {
         janetc_cerror(c, "break must occur in while loop or closure");
+        return janetc_cslot(janet_wrap_nil());
+    }
+    if (skips_remaining > 0) {
+        janetc_cerror(c, "break level too high");
         return janetc_cslot(janet_wrap_nil());
     }
 
     /* Emit code to break from that scope */
     JanetFopts subopts = janetc_fopts_default(c);
     if (scope->flags & JANET_SCOPE_FUNCTION) {
-        if (!(scope->flags & JANET_SCOPE_WHILE) && argn) {
+        if (!(scope->flags & JANET_SCOPE_WHILE) && argn > 0) {
             /* Closure body with return argument */
             subopts.flags |= JANET_FOPTS_TAIL;
             janetc_value(subopts, argv[0]);
             return janetc_cslot(janet_wrap_nil());
         } else {
             /* while loop IIFE or no argument */
-            if (argn) {
+            if (argn > 0) {
                 subopts.flags |= JANET_FOPTS_DROP;
                 janetc_value(subopts, argv[0]);
             }
@@ -806,12 +829,13 @@ static JanetSlot janetc_break(JanetFopts opts, int32_t argn, const Janet *argv) 
             return janetc_cslot(janet_wrap_nil());
         }
     } else {
-        if (argn) {
+        if (argn > 0) {
             subopts.flags |= JANET_FOPTS_DROP;
             janetc_value(subopts, argv[0]);
         }
-        /* Tag the instruction so the while special can turn it into a proper jump */
-        janetc_emit(c, 0x80 | JOP_JUMP);
+        /* Tag the instruction so the while special can turn it into a proper jump.
+         * We store the number of while loops to skip in the upper 24 bits. */
+        janetc_emit(c, (0x80 | JOP_JUMP) | (while_skips << 8));
         return janetc_cslot(janet_wrap_nil());
     }
 }
@@ -943,8 +967,13 @@ static JanetSlot janetc_while(JanetFopts opts, int32_t argn, const Janet *argv) 
 
     /* Calculate breaks */
     for (int32_t i = labelwt; i < labeld; i++) {
-        if (c->buffer[i] == (0x80 | JOP_JUMP)) {
-            c->buffer[i] = JOP_JUMP | ((labeld - i) << 8);
+        if ((c->buffer[i] & 0xFF) == (0x80 | JOP_JUMP)) {
+            int32_t skips = c->buffer[i] >> 8;
+            if (skips == 0) {
+                c->buffer[i] = JOP_JUMP | ((labeld - i) << 8);
+            } else {
+                c->buffer[i] = (0x80 | JOP_JUMP) | ((skips - 1) << 8);
+            }
         }
     }
 

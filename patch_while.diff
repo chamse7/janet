@@ -1,0 +1,20 @@
+<<<<<<< SEARCH
+    /* Calculate breaks */
+    for (int32_t i = labelwt; i < labeld; i++) {
+        if (c->buffer[i] == (0x80 | JOP_JUMP)) {
+            c->buffer[i] = JOP_JUMP | ((labeld - i) << 8);
+        }
+    }
+=======
+    /* Calculate breaks */
+    for (int32_t i = labelwt; i < labeld; i++) {
+        if ((c->buffer[i] & 0xFF) == (0x80 | JOP_JUMP)) {
+            int32_t skips = c->buffer[i] >> 8;
+            if (skips == 0) {
+                c->buffer[i] = JOP_JUMP | ((labeld - i) << 8);
+            } else {
+                c->buffer[i] = (0x80 | JOP_JUMP) | ((skips - 1) << 8);
+            }
+        }
+    }
+>>>>>>> REPLACE
