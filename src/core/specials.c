@@ -967,7 +967,7 @@ static JanetSlot janetc_while(JanetFopts opts, int32_t argn, const Janet *argv) 
 
     /* Calculate breaks */
     for (int32_t i = labelwt; i < labeld; i++) {
-        if ((c->buffer[i] & 0xFF) == (0x80 | JOP_JUMP)) {
+        if ((c->buffer[i] & 0x000000FF) == (0x80 | JOP_JUMP)) {
             int32_t skips = c->buffer[i] >> 8;
             if (skips == 0) {
                 c->buffer[i] = JOP_JUMP | ((labeld - i) << 8);
