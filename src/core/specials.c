@@ -767,7 +767,7 @@ static int32_t janetc_addfuncdef(JanetCompiler *c, JanetFuncDef *def) {
 /*
  * break
  *
- * jump :end or retn if in function
+ * jump :end of current or outer loop, or retn if in function
  */
 static JanetSlot janetc_break(JanetFopts opts, int32_t argn, const Janet *argv) {
     JanetCompiler *c = opts.compiler;
