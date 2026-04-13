@@ -814,14 +814,14 @@ static JanetSlot janetc_break(JanetFopts opts, int32_t argn, const Janet *argv) 
     /* Emit code to break from that scope */
     JanetFopts subopts = janetc_fopts_default(c);
     if (scope->flags & JANET_SCOPE_FUNCTION) {
-        if (!(scope->flags & JANET_SCOPE_WHILE) && argn > 0) {
+        if (!(scope->flags & JANET_SCOPE_WHILE) && argn) {
             /* Closure body with return argument */
             subopts.flags |= JANET_FOPTS_TAIL;
             janetc_value(subopts, argv[0]);
             return janetc_cslot(janet_wrap_nil());
         } else {
             /* while loop IIFE or no argument */
-            if (argn > 0) {
+            if (argn) {
                 subopts.flags |= JANET_FOPTS_DROP;
                 janetc_value(subopts, argv[0]);
             }
@@ -829,7 +829,7 @@ static JanetSlot janetc_break(JanetFopts opts, int32_t argn, const Janet *argv) 
             return janetc_cslot(janet_wrap_nil());
         }
     } else {
-        if (argn > 0) {
+        if (argn) {
             subopts.flags |= JANET_FOPTS_DROP;
             janetc_value(subopts, argv[0]);
         }
