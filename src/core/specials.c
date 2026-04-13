@@ -792,7 +792,7 @@ static JanetSlot janetc_break(JanetFopts opts, int32_t argn, const Janet *argv) 
     int32_t while_skips = 0;
     while (scope) {
         if (scope->flags & JANET_SCOPE_FUNCTION) {
-            break; /* Can't jump out of functions */
+            break; /* Cannot jump past function boundaries; emit return instead */
         }
         if (scope->flags & JANET_SCOPE_WHILE) {
             if (skips_remaining == 0) break;
